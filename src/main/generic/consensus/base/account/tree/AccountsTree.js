@@ -307,6 +307,15 @@ class AccountsTree extends Observable {
     /**
      * @param {string} startPrefix The prefix to start with.
      * @param {number} size The maximum number of terminal nodes to include.
+     * @returns {Promise.<Array.<AccountsTreeNode>>}
+     */
+    async getAccountsChunk(startPrefix, size) {
+        return await this._store.getTerminalNodes(startPrefix, size);
+    }
+
+    /**
+     * @param {string} startPrefix The prefix to start with.
+     * @param {number} size The maximum number of terminal nodes to include.
      * @returns {Promise.<AccountsTreeChunk>}
      */
     async getChunk(startPrefix, size) {

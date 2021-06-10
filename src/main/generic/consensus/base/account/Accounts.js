@@ -73,6 +73,15 @@ class Accounts extends Observable {
 
     /**
      * @param {string} startPrefix
+     * @param {number} size The maximum number of terminal nodes to include.
+     * @returns {Promise.Promise.<Array.<AccountsTreeNode>>}
+     */
+    getAccountsChunk(startPrefix, size) {
+        return this._tree.getAccountsChunk(startPrefix, size);
+    }
+
+    /**
+     * @param {string} startPrefix
      * @returns {Promise.<AccountsTreeChunk>}
      */
     getAccountsTreeChunk(startPrefix) {
