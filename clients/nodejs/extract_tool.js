@@ -6,6 +6,7 @@ try {
 }
 const readline = require('readline');
 const argv = require('minimist')(process.argv.slice(2));
+const BLOCK_TIME_MS = 60 * 1000;
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -16,7 +17,7 @@ const rl = readline.createInterface({
 /**
  * @param {<Array.<AccountsTreeNode>>} accountsTreeChunk
  */
-async function dumpAccountstoToml(accountsTreeChunk, chainDS, headBlockHeight, fileStream) {
+async function dumpAccountsToToml(accountsTreeChunk, chainDS, headBlockHeight, albatrossTs, fileStream) {
     for (const accountTreeNode of accountsTreeChunk) {
         var endOfLine = require('os').EOL;
         account = accountTreeNode.account;
@@ -42,19 +43,20 @@ async function dumpAccountstoToml(accountsTreeChunk, chainDS, headBlockHeight, f
             fileStream.write(endOfLine);
             fileStream.write(`owner = "${account_data.owner}"`);
             fileStream.write(endOfLine);
+	    let vestingStartTS;
             if (account_data.vestingStart <= headBlockHeight) {
                 vestingStartBlock = await chainDS.getBlockAt(account_data.vestingStart);
-                let vestingStartTS = vestingStartBlock.timestamp;
-                fileStream.write(`vesting_start_ts = ${vestingStartTS}`);
-                fileStream.write(endOfLine);
-            }
-            fileStream.write(`vesting_start = ${account_data.vestingStart}`);
+                vestingStartTS = vestingStartBlock.timestamp;
+            } else {
+	        vestingStartTS = (account_data.vestingStart - headBlockHeight) * BLOCK_TIME_MS + albatrossTs;
+	    }
+            fileStream.write(`start_time = ${vestingStartTS}`);
             fileStream.write(endOfLine);
-            fileStream.write(`vesting_step_blocks = ${account_data.vestingStepBlocks}`);
+            fileStream.write(`time_step = ${account_data.vestingStepBlocks}`);
             fileStream.write(endOfLine);
-            fileStream.write(`vesting_step_amount = ${account_data.vestingStepAmount}`);
+            fileStream.write(`step_amount = ${account_data.vestingStepAmount}`);
             fileStream.write(endOfLine);
-            fileStream.write(`vesting_total_amount = ${account_data.vestingTotalAmount}`);
+            fileStream.write(`total_amount = ${account_data.vestingTotalAmount}`);
             fileStream.write(endOfLine);
             fileStream.write(endOfLine);
         }
@@ -69,7 +71,8 @@ async function dumpAccountstoToml(accountsTreeChunk, chainDS, headBlockHeight, f
             fileStream.write(endOfLine);
             fileStream.write(`sender = "${account_data.sender}"`);
             fileStream.write(endOfLine);
-            fileStream.write(`hash_algorithm = "${account_data.hashAlgorithm}"`);
+            let hashAlgorithm = account_data.hashAlgorithm.charAt(0).toUpperCase() + account_data.hashAlgorithm.slice(1);
+            fileStream.write(`hash_algorithm = "${hashAlgorithm}"`);
             fileStream.write(endOfLine);
             fileStream.write(`hash_root = "${account_data.hashRoot}"`);
             fileStream.write(endOfLine);
@@ -77,13 +80,14 @@ async function dumpAccountstoToml(accountsTreeChunk, chainDS, headBlockHeight, f
             fileStream.write(endOfLine);
             fileStream.write(`hash_count = ${account_data.hashCount}`);
             fileStream.write(endOfLine);
+	    let htlcTimeoutTS;
             if (account_data.timeout <= headBlockHeight) {
                 htlcTimeoutBlock = await chainDS.getBlockAt(account_data.timeout);
-                let htlcTimeoutTS = htlcTimeoutBlock.timestamp;
-                fileStream.write(`timeout_ts = ${htlcTimeoutTS}`);
-                fileStream.write(endOfLine);
-            }
-            fileStream.write(`timeout = ${account_data.timeout}`);
+                htlcTimeoutTS = htlcTimeoutBlock.timestamp;
+            } else {
+		htlcTimeoutTS = (account_data.timeout - headBlockHeight) * BLOCK_TIME_MS + albatrossTs;
+	    }
+	    fileStream.write(`timeout = ${htlcTimeoutTS}`);
             fileStream.write(endOfLine);
             fileStream.write(`total_amount = ${account_data.totalAmount}`);
             fileStream.write(endOfLine);
@@ -106,7 +110,8 @@ async function dump_head_block_data(chainData, fileStream, customGenesisDelay) {
     fileStream.write(`custom_genesis_delay = ${customGenesisDelay}`);
     fileStream.write(endOfLine);
     fileStream.write(endOfLine);
-    return headBlockHeight;
+    albatrossTs = headBlockTs + customGenesisDelay;
+    return { headBlockHeight, albatrossTs};
 }
 
 async function dumpAccountsTree(fileName, chunkSize, customGenesisDelay) {
@@ -125,7 +130,7 @@ async function dumpAccountsTree(fileName, chunkSize, customGenesisDelay) {
     const chainData = await chainDS.getChainData(headHash, true);
 
     // Dump the head block info
-    const headBlockHeight = await dump_head_block_data(chainData, fileStream, customGenesisDelay);
+    const {headBlockHeight, albatrossTs} = await dump_head_block_data(chainData, fileStream, customGenesisDelay);
 
     // Dump the Accounts tree in chunks
     let actualChunksize = chunkSize;
@@ -137,7 +142,7 @@ async function dumpAccountsTree(fileName, chunkSize, customGenesisDelay) {
         console.log(`Processing chunk of size: ${actualChunksize}`);
         if (actualChunksize != 0) {
             startAddress = accountsTreeChunk[accountsTreeChunk.length - 1].prefix;
-            await dumpAccountstoToml(accountsTreeChunk,  chainDS, headBlockHeight, fileStream);
+            await dumpAccountsToToml(accountsTreeChunk, chainDS, headBlockHeight, albatrossTs, fileStream);
         }
     }
 
@@ -170,7 +175,7 @@ Options:
 
     try {
         outputFileName = argv._[0];
-        await dumpAccountsTree(outputFileName, argv.batchsize, argv.genesisdelay * 60);
+        await dumpAccountsTree(outputFileName, argv.batchsize, argv.genesisdelay * 60 * 1000);
         rl.close();
     } catch (e) {
         console.error(e.message || e.msg || e);
