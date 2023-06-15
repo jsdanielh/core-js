@@ -1,0 +1,17 @@
+{
+    "ValidatorAccount": {
+        //"Address": "NQ28 GSPY V07Q DJTK Y8TG DFYD KR5Q 9KBF HV5A",
+        //"Public Key": "d8b46a18cbf3773090ebebac648278ba98f66c039c167e34e6696c35581f2e88",
+        "PrivateKey": "84c03177d197282b8ab070446f5b8f8ddbd7e011ba8888788095d83e304c7c26"
+    },
+    "SigningKey": {
+        //"Address": "NQ50 6Y0C N109 PSGB 9FLR 17GX 6JVH QSKL LEGF",
+        //"Public Key": "9be2556c98df7947eba18fae6ff4bfaa062e8e73aadcef90a9c4c074c81798d5",
+        "PrivateKey": "8c1a66f6a13138b5bad4c33efc2691e2faf1a0b4cb1edb3bd5b0298fde01373e"
+    },
+    "VotingKey": {
+        "PublicKey": "fbab8a5c6fb20bd6ef62ae05fe6ac1a472cf1f3066e557ad30ccdd8ba2bb941edefd28bc83d259edeb16f3871195035c209d13c48230f7e48634a9f5edf182fbf96364669bdc910750e79024e7a401b94830cec40669326967dd7d52e36a0121a01c9f7a89c236daead1563fcdb7be67be7f0dfb7dba1506244bad7961bf526f12e06f5147b2658e8a13272bf64bd1dd90fbd9695c722b8a88cc2d46ebab2e93f357eb5d75cb091e1b2dff29a0a00c62e476e35cb8efcf2adc5fddb2ed00997b1dbfdf505f9926f88c72c7d081eb00a0670ed16eee546e8a184dfacde9aa6344b8ee46e279b3520338372c0c5b9e867ebcd41f5d58ed682f9e432c7e80b3a22ae47e609765e3843ca9d9879d0f63aaafed9dba0c5e5f2a68ab2c346d81",
+        "SecretKey": "e83d6d4ef169e422e59a3b3ad1f1d0ab339cc2507caffada04ad9edb29832b012db75b6772b46cc2d1e0f3bd46c60b7030730f6a13f6da1cbe24b2bc98c37ac68b9fee63443a0cda64dc274fd4a09b62f7e0924ec99edf385c907faca3ad01",
+        "Proof Of Knowledge": "0f50c86a376a1df44863acc759a687440a61a6ffa63c0a8ac47cf089086cdee5957509cf7324f135b76bac3c01c9df952dd9b06d3e1f046b12834f5a0f41e611f33c0f104e3be2fd99180f255feafc8b735000b0f7d23ec49f5e581f7b5f80"
+    }
+}
