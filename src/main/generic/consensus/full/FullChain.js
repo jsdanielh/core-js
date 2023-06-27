@@ -508,8 +508,8 @@ class FullChain extends BaseChain {
      * @param {string} startPrefix
      * @returns {Promise.<?AccountsTreeChunk>}
      */
-    async getAccountsTreeChunk(blockHash, startPrefix) {
-        const snapshot = await this._getSnapshot(blockHash);
+    async getAccountsTreeChunk(blockHash, startPrefix, blockLimit = Policy.NUM_SNAPSHOTS_MAX) {
+        const snapshot = await this._getSnapshot(blockHash, blockLimit);
         return snapshot && await snapshot.getAccountsTreeChunk(startPrefix);
     }
 
@@ -649,12 +649,12 @@ class FullChain extends BaseChain {
      * @param {Hash} blockHash
      * @returns {Promise.<?Accounts>}
      */
-    _getSnapshot(blockHash) {
+    _getSnapshot(blockHash, blockLimit = Policy.NUM_SNAPSHOTS_MAX) {
         // TODO Does this have to be synchronized with pushBlock() ?
         return this._synchronizer.push(/*priority*/ 1, async () => {
             const block = await this.getBlock(blockHash);
             // Check if blockHash is a block on the main chain within the allowed window.
-            if (!block || this._mainChain.head.height - block.height > Policy.NUM_SNAPSHOTS_MAX) {
+            if (!block || (blockLimit && this._mainChain.head.height - block.height > Policy.NUM_SNAPSHOTS_MAX)) {
                 return null;
             }
 
