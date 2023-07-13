@@ -50,7 +50,7 @@ for (const seedPeer of config.seedPeers) {
 /**
  * Dumps the validators registered in the 1.0 chain into a file for the PoS genesis block.
  * @param {fs.WriteStream>} fileStream Filestream where the 1.0 state will be dumped to.
- * @param {Array<{number, Transaction}>} transactions Array of transaction that were sent to the 1.0 burn address..
+ * @param {Array<TransactionDetails>} transactions Array of transaction that were sent to the 1.0 burn address.
  */
 async function dumpValidators(fileStream, transactions) {
     const possibleValidators = new Map();
@@ -299,10 +299,11 @@ async function dump_head_block_data(fileStream, block, customGenesisDelay, vrfSe
  * @param {string} fileName The file name where the chain state will be dumped.
  * @param {number} customGenesisDelay Genesis delay to be added to the 1.0 block timestamp for building the PoS genesis block.
  * @param {FullChain} blockchain Full blockchain.
+ * @param {Client} client Nimiq client.
  * @param {Block} block Block up until the state will be dumped.
  * @param {string} vrfSeed VRF seed of the PoS genesis block.
  */
-async function dumpChainState(fileName, customGenesisDelay, blockchain, block, vrfSeed) {
+async function dumpChainState(fileName, customGenesisDelay, blockchain, client, block, vrfSeed) {
     var fs = require('fs')
     var fileStream = fs.createWriteStream(fileName);
 
@@ -323,26 +324,11 @@ async function dumpChainState(fileName, customGenesisDelay, blockchain, block, v
         }
     } while (actualChunksize != 0)
 
-    transactionReceipts = await blockchain.getTransactionReceiptsByAddress(Nimiq.Address.fromUserFriendlyAddress(BURN_ADDRESS));
-    transactionReceipts.filter((receipt) => { receipt.blockHeight <= block.height });
-    const receiptsByBlock = transactionReceipts.reduce((receiptsByBlock, transactionReceipt) => {
-        const group = (receiptsByBlock[transactionReceipt.blockHash] || []);
-        group.push(transactionReceipt);
-        receiptsByBlock[transactionReceipt.blockHash] = group;
-        return receiptsByBlock;
-    }, {});
+    transactions = await client.getTransactionsByAddress(Nimiq.Address.fromUserFriendlyAddress(BURN_ADDRESS));
+    blockchain.getTransactionReceiptsByAddress(Nimiq.Address.fromUserFriendlyAddress(BURN_ADDRESS));
+    transactions.filter((txn) => { txn.blockHeight <= block.height });
 
-    var txns = [];
-    for (const [blockHash, receipts] of Object.entries(receiptsByBlock)) {
-        const transactionHashes = receipts.map(receipt => receipt.transactionHash);
-        const transactionsProof = await blockchain.getTransactionsProofByHashes(receipts[0].blockHash, transactionHashes);
-        txns = txns.concat(transactionsProof.transactions.map(txn => ({
-            transaction: txn,
-            blockHeight: receipts[0].blockHeight,
-        })));
-    }
-
-    await dumpValidators(fileStream, txns, block);
+    await dumpValidators(fileStream, transactions, block);
 
     fileStream.end();
     await finished(fileStream);
@@ -417,7 +403,7 @@ async function initNimiqClient(fileName, customGenesisDelay, blockHash, blockHei
                     console.error("Could not get block hash at specified block height");
                     process.exit(1);
                 }
-                await dumpChainState(fileName, customGenesisDelay, $.blockchain, block, vrfSeed);
+                await dumpChainState(fileName, customGenesisDelay, $.blockchain, $.client, block, vrfSeed);
                 process.exit(0);
             }
         }
