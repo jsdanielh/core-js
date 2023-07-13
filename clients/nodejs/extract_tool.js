@@ -229,10 +229,7 @@ async function dumpAccountsToToml(accountsTreeChunk, block, albatrossTs, fileStr
             fileStream.write(endOfLine);
             fileStream.write(`sender = "${account_data.sender}"`);
             fileStream.write(endOfLine);
-            let hashAlgorithm = account_data.hashAlgorithm.charAt(0).toUpperCase() + account_data.hashAlgorithm.slice(1);
-            fileStream.write(`hash_algorithm = "${hashAlgorithm}"`);
-            fileStream.write(endOfLine);
-            fileStream.write(`hash_root = "${account_data.hashRoot}"`);
+            fileStream.write(`hash_root = { hash = "${account_data.hashRoot}", algorithm = "${account_data.hashAlgorithm}" }`);
             fileStream.write(endOfLine);
             fileStream.write(`recipient = "${account_data.recipient}"`);
             fileStream.write(endOfLine);
