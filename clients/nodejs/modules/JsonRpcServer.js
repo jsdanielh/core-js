@@ -126,6 +126,7 @@ class JsonRpcServer {
         this._methods.set('createAccount', this.createAccount.bind(this));
         this._methods.set('getBalance', this.getBalance.bind(this));
         this._methods.set('getAccount', this.getAccount.bind(this));
+        this._methods.set('getAccountsTreeChunk', this.getAccountsTreeChunk.bind(this));
 
         // Blockchain
         this._methods.set('blockNumber', this.blockNumber.bind(this));
@@ -158,7 +159,7 @@ class JsonRpcServer {
      */
     static _authenticate(req, res, username, password) {
         if (username && password && req.headers.authorization !== `Basic ${btoa(`${username}:${password}`)}`) {
-            res.writeHead(401, {'WWW-Authenticate': 'Basic realm="Use user-defined username and password to access the JSON-RPC API." charset="UTF-8"'});
+            res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Use user-defined username and password to access the JSON-RPC API." charset="UTF-8"' });
             res.end();
             return false;
         }
@@ -313,7 +314,7 @@ class JsonRpcServer {
         } catch (e) {
             // Ignore, the tx is not yet known
         }
-        const txObj = await this._transactionToObj(tx);
+        const txObj = await this._transactionDetailsToObj(tx);
         txObj.valid = await tx.verify();
         txObj.inMempool = false;
         return txObj;
@@ -488,7 +489,7 @@ class JsonRpcServer {
         try {
             address = Nimiq.Address.fromString(addressStr);
             extraData = Nimiq.BufferUtils.fromHex(extraDataHex);
-        } catch (e) {}
+        } catch (e) { }
         const block = await this._miner.getNextBlock(address, extraData);
         if (!block) {
             const e = new Error('Cannot create work template, check state before requesting work.');
@@ -510,7 +511,7 @@ class JsonRpcServer {
         try {
             address = Nimiq.Address.fromString(addressStr);
             extraData = Nimiq.BufferUtils.fromHex(extraDataHex);
-        } catch (e) {}
+        } catch (e) { }
         const block = await this._miner.getNextBlock(address, extraData);
         if (!block) {
             const e = new Error('Cannot create work template, check state before requesting work.');
@@ -550,7 +551,7 @@ class JsonRpcServer {
         /** @type {Block} */
         const block = Nimiq.Block.unserialize(Nimiq.BufferUtils.fromHex(blockHex));
         if (!block.header.bodyHash.equals(block.body.hash())) throw new Error('Submitted invalid block: bodyHash and body.hash() mismatch');
-        return this._miner.onWorkerShare({hash: await block.header.pow(), nonce: block.header.nonce, block});
+        return this._miner.onWorkerShare({ hash: await block.header.pow(), nonce: block.header.nonce, block });
     }
 
     /*
@@ -578,6 +579,11 @@ class JsonRpcServer {
         const address = Nimiq.Address.fromString(addr);
         const account = await this._client.getAccount(address);
         return this._accountToObj(account, address);
+    }
+
+    async getAccountsTreeChunk(blockHash, startPrefix) {
+        const chunk = await this._consensus.blockchain.getAccountsTreeChunk(Nimiq.Hash.fromString(blockHash), startPrefix, null);
+        return chunk ? this._accountsTreeChunkToObj(chunk) : null;
     }
 
     /*
@@ -706,6 +712,32 @@ class JsonRpcServer {
     }
 
     /**
+     * @param {AccountsTreeNode} node
+     * @returns {object}
+     * @private
+     */
+    _accountsTreeNodeObj(node) {
+        return {
+            prefix: node.prefix,
+            account: this._accountToObj(node.account, Nimiq.Address.fromString(node.prefix))
+        }
+    }
+
+    /**
+     * @param {AccountsTreeChunk} chunk
+     * @returns {object}
+     * @private
+     */
+    _accountsTreeChunkToObj(chunk) {
+        return {
+            nodes: chunk.terminalNodes.filter((node) => node.isTerminal()).map((node) => this._accountsTreeNodeObj(node)),
+            proof: chunk.proof.toString(),
+            length: chunk.length,
+            tail: chunk.tail.prefix,
+        };
+    }
+
+    /**
      * @param {Client.PeerInfo} peerInfo
      * @param {Client.AddressInfo} addressInfo
      * @private
@@ -778,7 +810,7 @@ class JsonRpcServer {
             value: tx.value,
             fee: tx.fee,
             data: Nimiq.BufferUtils.toHex(tx.data) || null,
-            flags: tx.flags
+            flags: tx.flags,
         };
     }
 
@@ -795,13 +827,17 @@ class JsonRpcServer {
             confirmations: tx.confirmations,
             from: tx.sender.toHex(),
             fromAddress: tx.sender.toUserFriendlyAddress(),
+            fromType: tx.senderType,
             to: tx.recipient.toHex(),
             toAddress: tx.recipient.toUserFriendlyAddress(),
+            toType: tx.recipientType,
             value: tx.value,
             fee: tx.fee,
             data: Nimiq.BufferUtils.toHex(tx.data.raw) || null,
             proof: Nimiq.BufferUtils.toHex(tx.proof.raw) || null,
-            flags: tx.flags
+            flags: tx.flags,
+            validityStartHeight: tx.validityStartHeight,
+            networkId: tx.network,
         };
     }
 
@@ -847,7 +883,7 @@ class JsonRpcServer {
                 res.writeHead(400);
                 res.end(JSON.stringify({
                     'jsonrpc': '2.0',
-                    'error': {'code': -32600, 'message': 'Invalid Request'},
+                    'error': { 'code': -32600, 'message': 'Invalid Request' },
                     'id': null
                 }));
                 return;
@@ -861,7 +897,7 @@ class JsonRpcServer {
                 if (!msg || msg.jsonrpc !== '2.0' || !msg.method) {
                     result.push({
                         'jsonrpc': '2.0',
-                        'error': {'code': -32600, 'message': 'Invalid Request'},
+                        'error': { 'code': -32600, 'message': 'Invalid Request' },
                         'id': msg ? msg.id : null
                     });
                     continue;
@@ -870,7 +906,7 @@ class JsonRpcServer {
                     Nimiq.Log.w(JsonRpcServer, 'Unknown method called', msg.method);
                     result.push({
                         'jsonrpc': '2.0',
-                        'error': {'code': -32601, 'message': 'Method not found'},
+                        'error': { 'code': -32601, 'message': 'Method not found' },
                         'id': msg.id
                     });
                     continue;
@@ -878,13 +914,13 @@ class JsonRpcServer {
                 try {
                     const methodRes = await this._methods.get(msg.method).apply(null, msg.params instanceof Array ? msg.params : [msg.params]);
                     if (typeof msg.id === 'string' || Number.isInteger(msg.id)) {
-                        result.push({'jsonrpc': '2.0', 'result': methodRes, 'id': msg.id});
+                        result.push({ 'jsonrpc': '2.0', 'result': methodRes, 'id': msg.id });
                     }
                 } catch (e) {
                     Nimiq.Log.d(JsonRpcServer, e.stack);
                     result.push({
                         'jsonrpc': '2.0',
-                        'error': {'code': e.code || 1, 'message': e.message || e.toString()},
+                        'error': { 'code': e.code || 1, 'message': e.message || e.toString() },
                         'id': msg.id
                     });
                 }
